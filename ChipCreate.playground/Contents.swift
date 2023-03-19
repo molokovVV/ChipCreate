@@ -22,3 +22,20 @@ public struct Chip {
         sleep(solderingTime)
     }
 }
+
+class Storage {
+    private var stack: [Chip] = []
+    private let semaphore = DispatchSemaphore(value: 1)
+    
+    func push(_ chip: Chip) {
+        semaphore.wait()
+        stack.append(chip)
+        semaphore.signal()
+    }
+    
+    func pop() -> Chip? {
+        semaphore.wait()
+        defer { semaphore.signal() }
+        return stack.popLast()
+    }
+}
