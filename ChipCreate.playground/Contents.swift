@@ -80,3 +80,19 @@ class WorkerThread {
         }
     }
 }
+
+let storage = Storage()
+let generatingThread = GeneratingThread(storage: storage)
+let workerThread = WorkerThread(storage: storage)
+
+let group = DispatchGroup()
+
+group.enter()
+generatingThread.start()
+group.leave()
+
+group.enter()
+workerThread.start()
+group.leave()
+
+group.wait()
