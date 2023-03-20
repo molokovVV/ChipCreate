@@ -59,3 +59,24 @@ class GeneratingThread {
         }
     }
 }
+
+class WorkerThread {
+    let storage: Storage
+    
+    init(storage: Storage) {
+        self.storage = storage
+    }
+    
+    func start() {
+        DispatchQueue.global().async { [weak self] in
+            while true {
+                if let chip = self?.storage.pop() {
+                    print("Обработан Chip типа: \(chip.chipType)")
+                    chip.soldering()
+                } else {
+                    break
+                }
+            }
+        }
+    }
+}
