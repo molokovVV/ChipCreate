@@ -49,8 +49,8 @@ class GeneratingThread {
     
     func start() {
         DispatchQueue.global().async { [weak self] in
-            let startTime = Date().timeIntervalSince1970
-            while Date().timeIntervalSince1970 - startTime < 20 {
+            let startTime = Date().timeIntervalSinceReferenceDate
+            while Date().timeIntervalSinceReferenceDate - startTime < 20 {
                 let chip = Chip.make()
                 self?.storage.push(chip)
                 print("Создан Chip типа: \(chip.chipType)")
