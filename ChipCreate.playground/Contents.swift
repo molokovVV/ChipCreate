@@ -24,75 +24,79 @@ public struct Chip {
 }
 
 class Storage {
-    private var stack: [Chip] = []
-    private let semaphore = DispatchSemaphore(value: 1)
-    
+    private var chips: [Chip] = []
+    private let lock = NSLock()
+
     func push(_ chip: Chip) {
-        semaphore.wait()
-        stack.append(chip)
-        semaphore.signal()
+        lock.lock()
+        defer { lock.unlock() }
+        chips.append(chip)
     }
-    
+
     func pop() -> Chip? {
-        semaphore.wait()
-        defer { semaphore.signal() }
-        return stack.popLast()
+        lock.lock()
+        defer { lock.unlock() }
+        return chips.popLast()
+    }
+
+    var isEmpty: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return chips.isEmpty
     }
 }
 
-class GeneratingThread {
-    let storage: Storage
-    
+class GeneratingThread: Thread {
+    private let storage: Storage
+
     init(storage: Storage) {
         self.storage = storage
     }
-    
-    func start() {
-        DispatchQueue.global().async { [weak self] in
-            let startTime = Date().timeIntervalSinceReferenceDate
-            while Date().timeIntervalSinceReferenceDate - startTime < 20 {
-                let chip = Chip.make()
-                self?.storage.push(chip)
-                print("Создан Chip типа: \(chip.chipType)")
-                sleep(2)
-            }
+
+    override func main() {
+        let startTime = Date().timeIntervalSinceReferenceDate
+        while Date().timeIntervalSinceReferenceDate - startTime < 20 {
+            let chip = Chip.make()
+            storage.push(chip)
+            print("Создан Chip типа: \(chip.chipType)")
+            GeneratingThread.sleep(forTimeInterval: 2)
         }
     }
 }
 
-class WorkerThread {
-    let storage: Storage
-    
+class WorkerThread: Thread {
+    private let storage: Storage
+
     init(storage: Storage) {
         self.storage = storage
     }
-    
-    func start() {
-        DispatchQueue.global().async { [weak self] in
-            while true {
-                if let chip = self?.storage.pop() {
-                    print("Обработан Chip типа: \(chip.chipType)")
-                    chip.soldering()
-                } else {
-                    break
-                }
+
+    override func main() {
+        while !storage.isEmpty || !isCancelled {
+            if let chip = storage.pop() {
+                chip.soldering()
+                print("Обработан Chip типа: \(chip.chipType)")
+            } else {
+                WorkerThread.sleep(forTimeInterval: 1)
             }
         }
     }
 }
 
 let storage = Storage()
-let generatingThread = GeneratingThread(storage: storage)
+let generatorThread = GeneratingThread(storage: storage)
 let workerThread = WorkerThread(storage: storage)
 
-let group = DispatchGroup()
-
-group.enter()
-generatingThread.start()
-group.leave()
-
-group.enter()
+generatorThread.start()
 workerThread.start()
-group.leave()
 
-group.wait()
+while !generatorThread.isFinished {
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+}
+
+workerThread.cancel()
+
+while !workerThread.isFinished {
+    RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.1))
+}
+
